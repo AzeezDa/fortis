@@ -1,12 +1,13 @@
 module Assembler where
 
 import Data.Binary (Word16, Word8)
-import Data.Bits (shiftL, (.|.), shiftR, (.&.))
-import Data.Map (Map, empty, insert, lookup, member, elems)
-import Lexer (Token (..))
-import Parser (ParsingResult (..), Statement (..), parse)
+import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import Data.ByteString (ByteString, pack)
-import Data.List (sort)
+import Data.List (sort, intersperse)
+import Data.Map (Map, elems, empty, insert, lookup, member)
+import Lexer (Token (..))
+import Numeric (showHex)
+import Parser (ParsingResult (..), Statement (..), parse)
 
 data Assembler = Assembler
   { program :: [Word8],
@@ -56,15 +57,15 @@ analyseLabels a (_ : ss) =
 
 newInstruction :: Word8 -> Assembler -> Assembler
 newInstruction i a =
-  let pc = programCounter a
+  let pc = programCounter a 
    in let evenPC = even pc
        in if evenPC
             then
-              let newInst = i `shiftL` 4
+              let newInst = i 
                in a {programCounter = pc + 1, currentInstruction = newInst}
             else
               let currInst = currentInstruction a
-               in let newInst = currInst .|. i
+               in let newInst = currInst .|. (i `shiftL` 4)
                    in let prog = program a
                        in a
                             { program = newInst : prog,
@@ -96,17 +97,18 @@ inst2val t = case t of
 
 stmts2asm :: Assembler -> [Statement] -> AssemblerResult Assembler
 stmts2asm a [] =
-  let currInst = currentInstruction a in
-  let prog = currInst:program a in
-  Assembler.Result a {program = reverse prog}
+  let currInst = currentInstruction a
+   in let prog = currInst : program a
+       in Assembler.Result a {program = reverse prog}
 stmts2asm a ((Label _) : ss) = stmts2asm a ss
 stmts2asm a ((Nullary t) : ss) =
   let newAsm = newInstruction (inst2val t) a
    in stmts2asm newAsm ss
 stmts2asm a ((NextValue t n) : ss) =
   let asmWithInst = newInstruction (inst2val t) a
-   in let newAsm = newInstruction (fromInteger n) asmWithInst
-       in stmts2asm newAsm ss
+   in let val = fromInteger n .&. 0xf
+       in let newAsm = newInstruction val asmWithInst
+           in stmts2asm newAsm ss
 stmts2asm a ((JumpBranch t jmp) : ss) =
   let targetPC = Data.Map.lookup jmp (labelMap a)
    in case targetPC of
@@ -124,18 +126,23 @@ assembleStatements ss =
             Assembler.Error s -> labeledAsm
             Assembler.Result a -> stmts2asm a ss
 
-assemble :: String -> AssemblerResult ByteString
+romList2Bytes :: [Word16] -> [Word8]
+romList2Bytes [] = []
+romList2Bytes (l1:l2:r) =
+      let b1 :: Word8 = fromIntegral $ l1 .&. 0xff in
+      let b2 :: Word8 = fromIntegral $ (l1 `shiftR` 8) .|. ((l2 .&. 0xf) `shiftL` 4) in
+      let b3 :: Word8 = fromIntegral $ (l2 `shiftR` 4) .&. 0xff in 
+        b1:b2:b3:romList2Bytes r 
+
 assemble s = case parse s of
-    Parser.Error n -> Assembler.Error $ "Parse error at line" ++ show n
-    Parser.Result (ss, _, _) -> case assembleStatements ss of
-        Assembler.Error s -> Assembler.Error s
-        Assembler.Result a ->
-            let labelAddresses = map snd (sort $ elems $ labelMap a) in
-            let lcount = fromIntegral $ labelCount a in 
-            if lcount > 16 then Assembler.Error "Too many labels"
-            else let romList = labelAddresses ++ replicate (16-lcount) 0 in
-                 let romBytes = foldr (\e l -> let lo = fromIntegral $ e .&. 0xff in
-                                               let hi = fromIntegral $ e `shiftR` 8 in
-                                               hi:lo:l 
-                          ) [] romList in
-                 Assembler.Result $ pack $ romBytes ++ program a
+  Parser.Error n -> Assembler.Error $ "Parse error at line" ++ show n
+  Parser.Result (ss, _, _) -> case assembleStatements ss of
+    Assembler.Error s -> Assembler.Error s
+    Assembler.Result a ->
+      let labelAddresses = map snd (sort $ elems $ labelMap a)
+       in let lcount = fromIntegral $ labelCount a
+           in if lcount > 16
+                then Assembler.Error "Too many labels"
+                else
+                  let romList = labelAddresses ++ replicate (16 - lcount) 0
+                    in Assembler.Result $ pack $ romList2Bytes romList ++ program a

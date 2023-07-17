@@ -1,1 +1,40 @@
+SXV 0x4 SON 0xE OUT # N
+SXV 0x3 SON 0xF OUT # ?
+SXV 0x2 SON 0x0 OUT # <Space>
 
+SXV 3 SON 0 COP     # R2 = 0x30
+RIN SUB             # R1 = N
+
+PUS SXV 0xA OUT
+SXV 1 COP           # R2 = 1
+POP PUS             # R1 = N
+
+loop:
+MUL COP             # R2 *= R1
+POP AXV -1 PUS      # R1 -= 1
+BRP loop
+ADD                 # R1 = N!
+
+# === Printing ===
+PUS
+SXV 0x6 SON 0x4 COP # R2 = 100
+POP PUS DIV PUS     # R1 = N! / 100
+PUS SXV 0x3 SON 0x0
+COP POP ADD OUT     # Print 1st digit
+
+SXV 0x6 SON 0x4 COP # R2 = 100
+POP MUL COP POP     # R2 = 100 * 1st digit
+SUB PUS             # R1 = N! - R2
+
+SXV 0xA COP         # R2 = 10
+POP PUS DIV PUS     # R1 /= R1
+PUS SXV 0x3 SON 0x0
+COP POP ADD OUT     # Print 2nd digit
+
+SXV 0xA COP         # R2 = 10
+POP MUL COP POP PUS # R2 = 10 * 2nd digit
+SUB PUS             # R1 = 3rd digit
+
+SXV 0x3 SON 0x0 COP
+POP ADD OUT         # Print 3rd digit
+SXV 0xA OUT         # New Line

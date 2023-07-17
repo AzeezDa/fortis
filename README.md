@@ -1,4 +1,4 @@
-# Fortis - A 4-bit-Instruction-8-bit-Register-16-bit-addressing Computer
+# Fortis - A 4-bit-Instruction-8-bit-Register-12-bit-addressing Computer
 
 # Instruction Set Architecture
 
@@ -7,10 +7,10 @@
 | -------- | ----------- |
 | R1 | 8-bit Register 1 |
 | R2 | 8-bit Register 2 |
-| SP | 16-bit Stack Pointer, starts at 0xFFFE |
-| PC | 16-bit Program Counter, starts at 0x0000 |
+| SP | 12-bit Stack Pointer, starts at 0xFFF |
+| PC | 12-bit Program Counter, starts at 0x000 |
 
-Notes: The SP can span the entire memory space but the PC will use 15 bits for the memory access and 1 bit to filter which 4 bits of the 8-bit word to read.
+Notes: The SP can span the entire memory space but the PC will use 11 bits for the memory access and 1 bit to filter which 4 bits of the 8-bit word to read.
 
 ## Instructions
 
