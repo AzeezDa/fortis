@@ -10,3 +10,4 @@ AXV 3           OUT # r
 AXV -6          OUT # l
 AXV -8          OUT # d
 SXV 0xa         OUT # <New Line>
+HLT

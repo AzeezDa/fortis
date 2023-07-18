@@ -59,7 +59,7 @@ peek = Parser (\s n -> case lexIt s of
 nullaryInst :: Parser Statement
 nullaryInst = do
     t <- token
-    if t `elem` [COP, ADD, SUB, MUL, DIV, PUS, POP, RIN, OUT]
+    if t `elem` [COP, ADD, SUB, MUL, DIV, PUS, POP, RIN, OUT, HLT]
         then return $ Nullary t
     else empty
 
@@ -107,7 +107,6 @@ statement :: Parser Statement
 statement = do
     label <|> nullaryInst <|> nextValueInst <|> jumpBranchInst 
 
-
 program :: Parser [Statement]
 program = do
     p <- peek
@@ -119,4 +118,4 @@ program = do
                 return $ s:prog
 
 parse :: String -> ParsingResult [Statement]
-parse s = applyParser program s 0  
+parse s = applyParser program s 0

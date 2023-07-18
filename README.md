@@ -32,7 +32,10 @@ Notes: The SP can span the entire memory space but the PC will use 11 bits for t
 | 1101 | Pop from Stack | POP | `SP := SP + 1; R1 := *SP` |
 | 1110 | Read from stdin | RIN | `R1 := (next 8 bits from stdin)` (syscall) |
 | 1111 | Output to stdout | OUT | `stdout << R1` (syscall) |
+| -    | Halt             | HLT | Halts the CPU if three read instructions are `0000` |
 
+**Clarification for `Halt`**: If the machine code (in hex) is `0 1 3 4 0 0 0 1 4 F` then the machine will halt before reading the last three instructions `1 4 F`.
+Not including the `HLT` as an instructions in the code means it will halt when it reaches the end of the program if the memory space after the instructions are reset to 0.
 # Assembly Language Grammar
 Note that the the `<NullaryInst>`, `<NextValueInst>` and `<JumpBranchInst>` are case insensitive.
 So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.

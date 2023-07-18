@@ -28,6 +28,7 @@ data Token
   | POP
   | RIN
   | OUT
+  | HLT
   | Num Integer
   | Hex Integer
   | Ident String
@@ -76,6 +77,7 @@ checkToken t =
         "pop" -> POP
         "rin" -> RIN
         "out" -> OUT
+        "hlt" -> HLT
         _ -> Ident t
 
 getNumber :: String -> Token

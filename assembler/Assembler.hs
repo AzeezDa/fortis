@@ -46,9 +46,10 @@ analyseLabels a (Label str : ss) =
                                 labelCount = currLabelCnt + 1
                               }
                        in analyseLabels newAsm ss
-analyseLabels a (Nullary _ : ss) =
+analyseLabels a (Nullary t : ss) =
   let currPC = programCounter a
-   in let newAsm = a {programCounter = currPC + 1}
+   in let toAdd = if t == HLT then 3 else 1  
+    in let newAsm = a {programCounter = currPC + toAdd}
        in analyseLabels newAsm ss
 analyseLabels a (_ : ss) =
   let currPC = programCounter a
@@ -101,6 +102,9 @@ stmts2asm a [] =
    in let prog = currInst : program a
        in Assembler.Result a {program = reverse prog}
 stmts2asm a ((Label _) : ss) = stmts2asm a ss
+stmts2asm a ((Nullary HLT) : ss) =
+  let newAsm = iterate (newInstruction 0) a !! 3
+   in stmts2asm newAsm ss 
 stmts2asm a ((Nullary t) : ss) =
   let newAsm = newInstruction (inst2val t) a
    in stmts2asm newAsm ss
