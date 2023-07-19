@@ -3,23 +3,25 @@ module Assembler where
 import Data.Binary (Word16, Word8)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import Data.ByteString (ByteString, pack)
-import Data.List (sort, intersperse)
+import Data.List (intersperse, sort)
 import Data.Map (Map, elems, empty, insert, lookup, member)
 import Lexer (Token (..))
 import Numeric (showHex)
 import Parser (ParsingResult (..), Statement (..), parse)
 
+-- Holds the state of the currently assembled Assembler (no pun intended)
 data Assembler = Assembler
-  { program :: [Word8],
-    labelMap :: Map String (Word8, Word16),
-    programCounter :: Word16,
-    labelCount :: Word8,
+  { program :: [Word8], -- The Instructions as 2 instruction per byte [BBBB|AAAA]
+    labelMap :: Map String (Word8, Word16), -- Table from Label to (ROM Index, Address to Jump To)
+    programCounter :: Word16, -- Used when analysing labels
+    labelCount :: Word8, -- Used for checking that number of labels < 16
     currentInstruction :: Word8
   }
   deriving (Show)
 
 data AssemblerResult a = Result a | Error String
 
+-- Initial Assembler
 initAsm :: Assembler
 initAsm =
   Assembler
@@ -30,6 +32,9 @@ initAsm =
       currentInstruction = 0
     }
 
+-- Does one pass through the statements adding labels to the label map
+-- together with their indices and where they are located in terms of 
+-- program position
 analyseLabels :: Assembler -> [Statement] -> AssemblerResult Assembler
 analyseLabels a [] = Assembler.Result a {programCounter = 0}
 analyseLabels a (Label str : ss) =
@@ -48,21 +53,26 @@ analyseLabels a (Label str : ss) =
                        in analyseLabels newAsm ss
 analyseLabels a (Nullary t : ss) =
   let currPC = programCounter a
-   in let toAdd = if t == HLT then 3 else 1  
-    in let newAsm = a {programCounter = currPC + toAdd}
-       in analyseLabels newAsm ss
+   in let toAdd = if t == HLT then 3 else 1 -- Halt is 0x0 0x0 0x0
+       in let newAsm = a {programCounter = currPC + toAdd}
+           in analyseLabels newAsm ss
+-- Other than nullary and labels are Jump-Branch and Next-Value
+-- Both need two instructions hence the +2
 analyseLabels a (_ : ss) =
   let currPC = programCounter a
    in let newAsm = a {programCounter = currPC + 2}
        in analyseLabels newAsm ss
 
+-- Adds a new instruction (as bytes) to the assembler by packing
+-- them into a u8. See Machine Code in README.md for more 
+-- information
 newInstruction :: Word8 -> Assembler -> Assembler
 newInstruction i a =
-  let pc = programCounter a 
+  let pc = programCounter a
    in let evenPC = even pc
        in if evenPC
             then
-              let newInst = i 
+              let newInst = i
                in a {programCounter = pc + 1, currentInstruction = newInst}
             else
               let currInst = currentInstruction a
@@ -74,6 +84,7 @@ newInstruction i a =
                               programCounter = pc + 1
                             }
 
+-- Instruction to Value (as a nibble)
 inst2val :: Token -> Word8
 inst2val t = case t of
   SXV -> 0
@@ -94,8 +105,10 @@ inst2val t = case t of
   OUT -> 15
   Num a -> fromIntegral a
   Hex a -> fromIntegral a
-  _ -> error "Should not happen"
+  _ -> error "Should never happen"
 
+-- Statements to Assembler: Recursively go through the statements
+-- and assemble the Assembler
 stmts2asm :: Assembler -> [Statement] -> AssemblerResult Assembler
 stmts2asm a [] =
   let currInst = currentInstruction a
@@ -103,8 +116,8 @@ stmts2asm a [] =
        in Assembler.Result a {program = reverse prog}
 stmts2asm a ((Label _) : ss) = stmts2asm a ss
 stmts2asm a ((Nullary HLT) : ss) =
-  let newAsm = iterate (newInstruction 0) a !! 3
-   in stmts2asm newAsm ss 
+  let newAsm = iterate (newInstruction 0) a !! 3 -- Halt is 0x0 0x0 0x0
+   in stmts2asm newAsm ss
 stmts2asm a ((Nullary t) : ss) =
   let newAsm = newInstruction (inst2val t) a
    in stmts2asm newAsm ss
@@ -122,6 +135,9 @@ stmts2asm a ((JumpBranch t jmp) : ss) =
            in let newAsm = newInstruction n asmWithInst
                in stmts2asm newAsm ss
 
+-- Takes a list of statements and try to return an assembler
+
+-- holding the ROM and the Program
 assembleStatements :: [Statement] -> AssemblerResult Assembler
 assembleStatements ss =
   let newAsm = initAsm
@@ -130,14 +146,22 @@ assembleStatements ss =
             Assembler.Error s -> labeledAsm
             Assembler.Result a -> stmts2asm a ss
 
+-- Convert the ROM Address from u16 into 12-bit address by 
+-- packing then into a byte and a half resulting a total 
+-- of 24 bytes for the ROM
 romList2Bytes :: [Word16] -> [Word8]
 romList2Bytes [] = []
-romList2Bytes (l1:l2:r) =
-      let b1 :: Word8 = fromIntegral $ l1 .&. 0xff in
-      let b2 :: Word8 = fromIntegral $ (l1 `shiftR` 8) .|. ((l2 .&. 0xf) `shiftL` 4) in
-      let b3 :: Word8 = fromIntegral $ (l2 `shiftR` 4) .&. 0xff in 
-        b1:b2:b3:romList2Bytes r 
+romList2Bytes (l1 : l2 : r) =
+  let b1 :: Word8 = fromIntegral $ l1 .&. 0xff
+   in let b2 :: Word8 = fromIntegral $ (l1 `shiftR` 8) .|. ((l2 .&. 0xf) `shiftL` 4)
+       in let b3 :: Word8 = fromIntegral $ (l2 `shiftR` 4) .&. 0xff
+           in b1 : b2 : b3 : romList2Bytes r
 
+-- The Assembler Function: Takes a String written in the
+-- Fortis Assembly Language and tries to return the
+-- corresponding machine code (with ROM). This function
+-- basically Lexes, Parses and Assembles the input string
+assemble :: String -> AssemblerResult ByteString
 assemble s = case parse s of
   Parser.Error n -> Assembler.Error $ "Parse error at line" ++ show n
   Parser.Result (ss, _, _) -> case assembleStatements ss of
@@ -149,4 +173,4 @@ assemble s = case parse s of
                 then Assembler.Error "Too many labels"
                 else
                   let romList = labelAddresses ++ replicate (16 - lcount) 0
-                    in Assembler.Result $ pack $ romList2Bytes romList ++ program a
+                   in Assembler.Result $ pack $ romList2Bytes romList ++ program a

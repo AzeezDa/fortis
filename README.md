@@ -1,8 +1,19 @@
 # Fortis - A 4-bit-Instruction-8-bit-Register-12-bit-addressing Computer
 
-# Instruction Set Architecture
+## Table of Content
 
-## Registers
+- [Instruction Set Architecture](#instruction-set-architecture)
+    - [Registers](#registers)
+    - [Instructions](#instructions)
+- [Assembly Language Grammar](#assembly-language-grammar)
+- [Assembler and Machine Code File Structure](#assembler-and-machine-code-file-structure)
+    - [ROM](#rom)
+    - [Instructions](#instructions-1)
+    - [Example](#example)
+
+## Instruction Set Architecture
+
+### Registers
 | Register | Description |
 | -------- | ----------- |
 | R1 | 8-bit Register 1 |
@@ -12,7 +23,7 @@
 
 Notes: The SP can span the entire memory space but the PC will use 11 bits for the memory access and 1 bit to filter which 4 bits of the 8-bit word to read.
 
-## Instructions
+### Instructions
 
 | Bits | Full Name | Mnemonic | Operation |
 | ---- | --------- | -------- | --------- |
@@ -36,7 +47,8 @@ Notes: The SP can span the entire memory space but the PC will use 11 bits for t
 
 **Clarification for `Halt`**: If the machine code (in hex) is `0 1 3 4 0 0 0 1 4 F` then the machine will halt before reading the last three instructions `1 4 F`.
 Not including the `HLT` as an instructions in the code means it will halt when it reaches the end of the program if the memory space after the instructions are reset to 0.
-# Assembly Language Grammar
+
+## Assembly Language Grammar
 Note that the the `<NullaryInst>`, `<NextValueInst>` and `<JumpBranchInst>` are case insensitive.
 So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.
 
@@ -62,6 +74,7 @@ So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.
                        | "pop"
                        | "rin"
                        | "out"
+                       | "hlt"
     <NextValueInst>  ::= "sxv"
                        | "axv"
                        | "son"
@@ -69,4 +82,52 @@ So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.
                        | "brz"
                        | "brn"
                        | "brp"
+```
+
+## Assembler and Machine Code File Structure
+#### ROM
+The assembler takes a Fortis Assembly Langauge file and generates the corresponding machine code file. The machine code contains both the ROM and the instructions.
+
+The first 24 bytes contain the values of the 16 12-bit ROM memory cells. Where every 3 bytes contain 2 memory cells in this structure:
+
+```
+BYTE 0: [|r7 r6 r5 r4 r3 r2 r1 r0|]
+BYTE 1: [|R3 R2 R1 R0|rB rA r9 r8|]
+BYTE 2: [|RB RA R9 R8 R7 R6 R5 R4|]
+```
+
+Where `rx` is the first ROM cell and the `Rx` is the following ROM cell. (`x` is the bit index of each ROM cell).
+
+So to unroll these three bytes we take the 0th byte and append the least significant nibble of the 1st byte unto the 0th byte. This is the zeroth ROM cell.
+```
+ROM 0: [|rB rA r9 r8 r7 r6 r5 r4 r3 r2 r1 r0|]
+```
+The second ROM cell is given by the taking the most significant nibble of the 1st byte and append the 2nd byte to it giving:
+```
+ROM 1: [|RB RA R9 R8 R7 R6 R5 R4 R3 R2 R1 R0|]
+```
+This is continued until all 24 bytes are converted.
+
+#### Instructions
+After the first 24 bytes, the instructions are stored where each byte contains two instructions. The least significant nibble is the first instruction, and the most significant nibble is the following instruction. Thus the instructions have the following byte-wise structure:
+```
+BYTE 0: [|I1 I1 I1 I1|I0 I0 I0 I0|]
+BYTE 1: [|I3 I3 I3 I3|I2 I2 I2 I2|]
+BYTE 2: [|I5 I5 I5 I5|I6 I6 I6 I6|]
+ . . .          .    .    .
+```
+Where `Ix` are the bits of instruction `x` (do not confuse it with the ROM description above).
+
+Therefore, to extract the `x`th instruction, extract the `(x>>2)`th byte then if `(x&1)` is `0` then we instruction we seek the is the least significant nibble of the extracted byte, otherwise we extract the most significant nibble of that byte. 
+
+#### Example
+Assembling the [factorial.asm](examples/factorial.asm) file will produce the following file (which is hexdumped).
+
+```
+$ hexdump -e '"%04.4_ax: " 24/1 "%02x " "\n"' out
+0000:  2d 80 03 3c 20 08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+0018:  40 e2 0f 23 ff 20 02 0f 23 30 5e 19 3a cc 50 d3 b5 d3 0c fa 10 d3 6c d3
+0030:  f1 bc 40 28 10 28 0c 26 34 cd c7 0c 23 30 4d 0f 26 34 6d d3 c5 a0 d3 7c
+0048:  cc 30 02 d3 f4 a0 d3 36 cd c5 30 02 d3 f4 a0 0f 00 70 52 1f f9 51 1f f2
+0060:  b1 ff f1 1f f3 21 0f 26 f5 f1 0f fa 00 00  
 ```

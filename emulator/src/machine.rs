@@ -1,5 +1,6 @@
 use std::{fs, io::Write};
 
+// To avoid magic numbers in the match statements to come
 const SXV: u8 = 0;
 const AXV: u8 = 1;
 const SON: u8 = 2;
@@ -16,24 +17,35 @@ const PUS: u8 = 12;
 const POP: u8 = 13;
 const RIN: u8 = 14;
 const OUT: u8 = 15;
+const RAM_SIZE: usize = 4096;
+const ROM_SIZE: usize = 16;
+const ROM_SIZE_AS_BYTES: usize = 24;
+const STACK_POINTER_START: usize = 0xFFF;
+const PROGRAM_COUNTER_START: usize = 0x000;
+const HALT_SEQUNECE_LENGTH: u8 = 3;
 
+// Representation of a Fortis machine 
 #[derive(Debug)]
 pub struct Machine {
-    rom: [u16; 16],
-    ram: [u8; 4096],
-    r1: u8,
-    r2: u8,
+    rom: [u16; ROM_SIZE],
+    ram: [u8; RAM_SIZE], // Holds instructions and the stack
+    r1: u8, // Register 1
+    r2: u8, // Register 2
+    // usize because it is easier to access ram. They are wrapped in the execution 
     stack_pointer: usize,
     program_counter: usize,
     previous_inst: u8,
-    reads_next: bool,
-    halt: u8,
+    reads_next: bool, // Used for Next-Value Instructions
+    halt: u8, // Increments for each consecutive 0x0 instruction
 }
-
 impl Machine {
+    // Tries to create a new Fortis machine using the given Fortis machine code file path
     pub fn new(file_path: String) -> Result<Self, Box<dyn std::error::Error + 'static>> {
         let fp = fs::read(file_path)?;
-        let rom = fp[0..24]
+        // Since each ROM cell is 12 bits, every 3 bytes contain 2 ROM cells.
+        // So here we go through every 3 bytes and map then into two u16
+        // (since there is no u12 in Rust) 
+        let rom = fp[0..ROM_SIZE_AS_BYTES]
             .chunks(3)
             .flat_map(|b| {
                 let (b0, b1, b2) = (b[0] as u16, b[1] as u16, b[2] as u16);
@@ -43,31 +55,38 @@ impl Machine {
             .try_into()
             .unwrap();
 
-        let mut ram = [0; 4096];
-        ram[..fp[24..].len()].clone_from_slice(&fp[24..]);
+        let mut ram = [0; RAM_SIZE];
+        ram[..fp[ROM_SIZE_AS_BYTES..].len()].clone_from_slice(&fp[ROM_SIZE_AS_BYTES..]);
+        
         Ok(Self {
             rom,
             ram,
             r1: 0,
             r2: 0,
-            stack_pointer: 0xfff,
-            program_counter: 0,
+            stack_pointer: STACK_POINTER_START,
+            program_counter: PROGRAM_COUNTER_START,
             previous_inst: 0,
             reads_next: false,
             halt: 0,
         })
     }
 
+    // One CPU cycle (Note: Next-Value and Jump-Branch instructions takes 2 cycles to execute)
     pub fn cycle(&mut self) -> Result<&mut Self, &'static str> {
         let inst = self.at_program_counter();
+
+        // Halt sequence detector
         self.halt = if inst == 0 { self.halt + 1 } else { 0 };
-        if self.halt >= 3 {
+        if self.halt >= HALT_SEQUNECE_LENGTH {
             return Ok(self);
         }
 
         self.program_counter += 1;
-        self.program_counter %= 4096;
+        self.program_counter %= RAM_SIZE;
 
+        // Previous instruction was a Next-Value or Jump-Branch
+        // So the machine uses the current instruction value
+        // as a parameter to the previous instruction
         if self.reads_next {
             self.reads_next = false;
             return match self.previous_inst {
@@ -83,6 +102,7 @@ impl Machine {
         }
 
         match inst {
+            // Next-Value or Jump-Branch
             SXV | AXV | SON | JRX | BRZ | BRN | BRP => {
                 self.reads_next = true;
                 self.previous_inst = inst;
@@ -102,14 +122,16 @@ impl Machine {
         }
     }
 
+    // Run the machine until it halts
     pub fn run(&mut self) {
-        while self.halt < 3 {
+        while self.halt < HALT_SEQUNECE_LENGTH {
             if let Err(s) = self.cycle() {
                 println!("Error: {}", s);
             }
         }
     }
 
+    // Returns the instruction at the machine's program counter
     #[inline(always)]
     pub fn at_program_counter(&self) -> u8 {
         let memory_cell = self.ram[self.program_counter >> 1];
@@ -120,6 +142,8 @@ impl Machine {
         }
     }
 
+    /* === Instructions as Functions === */
+
     #[inline(always)]
     fn sxv(&mut self, inst: u8) -> Result<&mut Self, &'static str> {
         self.r1 = inst;
@@ -128,6 +152,7 @@ impl Machine {
 
     #[inline(always)]
     fn axv(&mut self, inst: u8) -> Result<&mut Self, &'static str> {
+        // Sign extend u4 -> u8
         let sign_extend = if inst >> 3 == 1 {0xf0 | inst} else {inst};
         self.r1 = self.r1.wrapping_add(sign_extend);
         Ok(self)
@@ -207,20 +232,23 @@ impl Machine {
     #[inline(always)]
     fn pus(&mut self) -> Result<&mut Self, &'static str> {
         self.ram[self.stack_pointer] = self.r1;
-        self.stack_pointer = self.stack_pointer.wrapping_sub(1) % 4096; // wrapping 4096
+        self.stack_pointer = self.stack_pointer.wrapping_sub(1) % RAM_SIZE;
         Ok(self)
     }
 
     #[inline(always)]
     fn pop(&mut self) -> Result<&mut Self, &'static str> {
         self.stack_pointer += 1;
-        self.stack_pointer %= 4096;
+        self.stack_pointer %= RAM_SIZE;
         self.r1 = self.ram[self.stack_pointer];
         Ok(self)
     }
 
+    // To "emulate" the machine the emulator reads the first character of each line
+    // (This was done to avoid termios and the platform dependency rabbit hole)
     #[inline(always)]
     fn rin(&mut self) -> Result<&mut Self, &'static str> {
+        // Flushes stdout buffer to avoid reading before displaying
         if let Err(_) = std::io::stdout().flush() {
             return Err("Error flushing stdout");
         }
