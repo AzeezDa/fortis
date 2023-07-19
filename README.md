@@ -2,6 +2,8 @@
 
 ## Table of Content
 
+- [Installation](#installation)
+- [Usage](#usage)
 - [Instruction Set Architecture](#instruction-set-architecture)
     - [Registers](#registers)
     - [Instructions](#instructions)
@@ -11,6 +13,56 @@
     - [Instructions](#instructions-1)
     - [Example](#example)
 
+## Installation
+Prequistes: [Rust, Cargo](https://www.rust-lang.org/tools/install) and [GHC](https://www.haskell.org/ghc/download.html) installed.
+
+
+Currently there is only installation for Linux.
+
+**Step 1:** Clone this repository to somewhere you want (or by default `~/fortis`):
+
+```
+git clone https://github.com/AzeezDa/fortis.git ~/fortis
+```
+
+**Step 2:** Go into the directory where the repository was cloned 
+```
+cd ~/fortis 
+```
+
+**Step 3:** Give the `install` execute permission
+```
+chmod +x install
+```
+
+**Step 4:** Run the `install` script:
+```
+./install
+```
+If no errors occured and the install printed (may differ a bit, but most important is the last line)
+```
+Compiling the Fortis Assembler
+[1 of 4] Compiling Lexer            ( Lexer.hs, Lexer.o )
+[2 of 4] Compiling Parser           ( Parser.hs, Parser.o )
+[3 of 4] Compiling Assembler        ( Assembler.hs, Assembler.o )
+[4 of 4] Compiling Main             ( Main.hs, Main.o )
+Linking ../build/assembler ...
+The Fortis Assembler compiled successfully!
+Compiling the Fortis Machine Emulator
+   Compiling emulator v0.1.0 (/home/name/fortis/emulator)
+    Finished release [optimized] target(s) in 0.93s
+The Fortis Machine Emulator compiled successfully!
+Setting up the Fortis executable
+Installation complete!
+```
+then everything is good to go!
+
+**Step 6 (Optional):** Add the following to `.bashrc` or similar to alias the `fortis` executable
+```
+alias fortis=~/fortis/build/fortis
+```
+## Usage
+Run `~/build/fortis -h` (or `fortis -h` if you have aliased it) for help about using the assembler and emulator.
 ## Instruction Set Architecture
 
 ### Registers

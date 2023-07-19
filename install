@@ -1,0 +1,77 @@
+#!/bin/sh
+failure () {
+    rm -rf build
+    exit 1
+}
+
+if [ -d "build" ]
+then
+    echo "There already is a build/ directory. Remove it if you want to reinstall Fortis"
+    exit 1
+fi
+
+mkdir build
+
+echo "Compiling the Fortis Assembler"
+cd assembler/
+if ghc Main.hs -no-keep-hi-files -no-keep-o-files -o ../build/assembler ; then 
+    echo "The Fortis Assembler compiled successfully!"
+else 
+    echo "Error with GHC. Make sure it is installed properly"
+    cd ..
+    failure
+fi
+
+echo "Compiling the Fortis Machine Emulator"
+cd ../emulator
+if cargo build --release ; then 
+    echo "The Fortis Machine Emulator compiled successfully!"
+else
+    echo "Cargo failed to build the emulator. Make sure Cargo and Rust are installed properly." 
+    cd ..
+    failure
+fi
+
+mv target/release/emulator ../build/emulator
+
+cd ../build
+
+echo "Setting up the Fortis executable"
+cat<<EOF > fortis
+#!/usr/bin/env python3
+import subprocess
+import argparse
+import os
+import tempfile
+
+# Set up paths
+dirname = os.path.dirname(__file__)
+cwd = os.getcwd()
+os.chdir(dirname)
+
+# Set up arguments
+parser = argparse.ArgumentParser(description="Fortis Assembler and Emulator", epilog="Thank you for using Fortis!")
+parser.add_argument("action", choices=["assemble", "execute", "run"], help="Assemble will convert the given file to a Fortis Machine Code file. Execute will run a Fortis Machine Code file using the emulator. Run will assemble and execute (on the emulator) the given Fortis Assembly file without generating the intermediate Machine Code file (it created as a temporary file)")
+parser.add_argument("filename", help="The file to assemble or execute (on the emulator)")
+parser.add_argument("-o", "--out", default="out", help="The output file (only needed when assembling)")
+args = parser.parse_args()
+
+# Do as the command says
+match args.action:
+    case "assemble":
+        input_file = os.path.join(cwd, args.filename)
+        output_file = os.path.join(cwd, args.output)
+        subprocess.run(["./fortis_assembler", input_file, output_file])
+    case "execute":
+        input_file = os.path.join(cwd, args.filename)
+        subprocess.run(["./fortis_emulator", input_file])
+    case "run":
+        with tempfile.NamedTemporaryFile("wb") as temp:
+            input_file = os.path.join(cwd, args.filename)
+            sp = subprocess.run(["./fortis_assembler", input_file, temp.name])
+            if sp.returncode == 0:
+                subprocess.run(["./fortis_emulator", temp.name])
+EOF
+chmod +x ./fortis
+cd ..
+echo "Installation complete!"
