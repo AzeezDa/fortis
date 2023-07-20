@@ -61,16 +61,16 @@ match args.action:
     case "assemble":
         input_file = os.path.join(cwd, args.filename)
         output_file = os.path.join(cwd, args.output)
-        subprocess.run(["./fortis_assembler", input_file, output_file])
+        subprocess.run(["./assembler", input_file, output_file])
     case "execute":
         input_file = os.path.join(cwd, args.filename)
-        subprocess.run(["./fortis_emulator", input_file])
+        subprocess.run(["./emulator", input_file])
     case "run":
         with tempfile.NamedTemporaryFile("wb") as temp:
             input_file = os.path.join(cwd, args.filename)
-            sp = subprocess.run(["./fortis_assembler", input_file, temp.name])
+            sp = subprocess.run(["./assembler", input_file, temp.name])
             if sp.returncode == 0:
-                subprocess.run(["./fortis_emulator", temp.name])
+                subprocess.run(["./emulator", temp.name])
 EOF
 chmod +x ./fortis
 cd ..

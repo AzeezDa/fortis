@@ -14,7 +14,7 @@
     - [Example](#example)
 
 ## Installation
-Prequistes: [Rust, Cargo](https://www.rust-lang.org/tools/install) and [GHC](https://www.haskell.org/ghc/download.html) installed.
+Prerequisites: [Rust, Cargo](https://www.rust-lang.org/tools/install) and [GHC](https://www.haskell.org/ghc/download.html) installed.
 
 
 Currently there is only installation for Linux.
@@ -39,7 +39,7 @@ chmod +x install
 ```
 ./install
 ```
-If no errors occured and the install printed (may differ a bit, but most important is the last line)
+If no errors occurred and the install printed (may differ a bit, but most important is the last line)
 ```
 Compiling the Fortis Assembler
 [1 of 4] Compiling Lexer            ( Lexer.hs, Lexer.o )
@@ -59,7 +59,7 @@ then everything is good to go!
 
 **Step 6 (Optional):** Add the following to `.bashrc` or similar to alias the `fortis` executable
 ```
-alias fortis=~/fortis/build/fortis
+alias fortis="~/fortis/build/fortis"
 ```
 ## Usage
 Run `~/build/fortis -h` (or `fortis -h` if you have aliased it) for help about using the assembler and emulator.
@@ -109,12 +109,12 @@ So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.
                        | <Statement> <Program>
     <Statement>      ::= <Label>
                        | <Inst>
-    <Label>          ::= <Identifer> ":"
+    <Label>          ::= <Identifier> ":"
     <Inst>           ::= <NullaryInst>
                        | <NextValueInst> <Num>
-                       | <JumpBranchInst> <Ident>
+                       | <JumpBranchInst> <Identifier>
     
-    <Ident>          ::= [_a-zA-z][a-zA-z0-9]*
+    <Identifier>     ::= [_a-zA-z][a-zA-z0-9]*
     <Num>            ::= -?[0-7] | "-8" | <Hexit>
     <Hexit>          ::= 0x([0-9]|[a-f]|[A-F])
     <NullaryInst>    ::= "cop"
@@ -138,7 +138,7 @@ So for example `cop` `COP` and `CoP` all mean the *Copy Instruction*.
 
 ## Assembler and Machine Code File Structure
 #### ROM
-The assembler takes a Fortis Assembly Langauge file and generates the corresponding machine code file. The machine code contains both the ROM and the instructions.
+The assembler takes a Fortis Assembly Language file and generates the corresponding machine code file. The machine code contains both the ROM and the instructions.
 
 The first 24 bytes contain the values of the 16 12-bit ROM memory cells. Where every 3 bytes contain 2 memory cells in this structure:
 

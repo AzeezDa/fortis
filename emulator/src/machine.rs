@@ -22,7 +22,7 @@ const ROM_SIZE: usize = 16;
 const ROM_SIZE_AS_BYTES: usize = 24;
 const STACK_POINTER_START: usize = 0xFFF;
 const PROGRAM_COUNTER_START: usize = 0x000;
-const HALT_SEQUNECE_LENGTH: u8 = 3;
+const HALT_SEQUENCE_LENGTH: u8 = 3;
 
 // Representation of a Fortis machine 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ impl Machine {
 
         // Halt sequence detector
         self.halt = if inst == 0 { self.halt + 1 } else { 0 };
-        if self.halt >= HALT_SEQUNECE_LENGTH {
+        if self.halt >= HALT_SEQUENCE_LENGTH {
             return Ok(self);
         }
 
@@ -124,7 +124,7 @@ impl Machine {
 
     // Run the machine until it halts
     pub fn run(&mut self) {
-        while self.halt < HALT_SEQUNECE_LENGTH {
+        while self.halt < HALT_SEQUENCE_LENGTH {
             if let Err(s) = self.cycle() {
                 println!("Error: {}", s);
             }

@@ -31,8 +31,8 @@ Make Parser into a Monad by:
 
 Each definition basically is applying the parser and
 then if an error results then we return it with the
-line number where the error occured. If no errors
-occured then we apply the next parser on the result
+line number where the error occurred. If no errors
+occurred then we apply the next parser on the result
 ===================================================== -}
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b
